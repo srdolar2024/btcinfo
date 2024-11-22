@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Criptomonedas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .price-card {
+            text-align: center;
+        }
+
+        .price-card h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196f3;
+        }
+
+        .change {
+            font-size: 16px;
+            margin-top: 5px;
+        }
+
+        .positive {
+            color: #4caf50;
+        }
+
+        .negative {
+            color: #f44336;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .news-container {
+            height: 400px;
+            overflow-y: auto;
+        }
+
+        .news-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .news-item h3 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .news-item p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dashboard Criptomonedas</h1>
+            <p>Última actualización: <span id="lastUpdate"></span></p>
+        </div>
+
+        <div class="grid">
+            <div class="card price-card">
+                <h2>Bitcoin (BTC)</h2>
+                <div class="price" id="btcPrice">Cargando...</div>
+                <div class="change" id="btcChange">--</div>
+            </div>
+            <div class="card price-card">
+                <h2>Ethereum (ETH)</h2>
+                <div class="price" id="ethPrice">Cargando...</div>
+                <div class="change" id="ethChange">--</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Gráfico de Precios</h2>
+            <div class="chart-container">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Noticias del Mercado</h2>
+            <div class="news-container" id="newsContainer">
+                Cargando noticias...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let priceChart;
+
+        async function fetchCryptoData() {
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
+                const data = await response.json();
+                
+                // Actualizar precios de Bitcoin
+                document.getElementById('btcPrice').textContent = `$${data.bitcoin.usd.toLocaleString()}`;
+                const btcChange = data.bitcoin.usd_24h_change.toFixed(2);
+                document.getElementById('btcChange').textContent = `${btcChange}%`;
+                document.getElementById('btcChange').className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
+
+                // Actualizar precios de Ethereum
+                document.getElementById('ethPrice').textContent = `$${data.ethereum.usd.toLocaleString()}`;
+                const ethChange = data.ethereum.usd_24h_change.toFixed(2);
+                document.getElementById('ethChange').textContent = `${ethChange}%`;
+                document.getElementById('ethChange').className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
+
+                // Actualizar hora de última actualización
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+            } catch (error) {
+                console.error('Error al obtener datos de criptomonedas:', error);
+            }
+        }
+
+        async function fetchHistoricalData() {
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7&interval=daily');
+                const data = await response.json();
+                
+                const labels = data.prices.map(price => {
+                    const date = new Date(price[0]);
+                    return date.toLocaleDateString();
+                });
+                
+                const prices = data.prices.map(price => price[1]);
+
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Precio de Bitcoin (USD)',
+                            data: prices,
+                            borderColor: '#2196f3',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error al obtener datos históricos:', error);
+            }
+        }
+
+        async function fetchNews() {
+            try {
+                // Simular noticias (en un entorno real, usarías una API de noticias)
+                const newsContainer = document.getElementById('newsContainer');
+                newsContainer.innerHTML = `
+                    <div class="news-item">
+                        <h3>Bitcoin alcanza nuevo máximo del año</h3>
+                        <p>El precio de Bitcoin ha superado importantes resistencias técnicas...</p>
+                    </div>
+                    <div class="news-item">
+                        <h3>Ethereum mejora su red</h3>
+                        <p>Nuevas actualizaciones prometen mayor escalabilidad...</p>
+                    </div>
+                    <div class="news-item">
+                        <h3>Análisis del Mercado</h3>
+                        <p>Los expertos prevén un mercado alcista para los próximos meses...</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error al obtener noticias:', error);
+            }
+        }
+
+        // Inicializar y actualizar datos
+        async function initDashboard() {
+            await fetchCryptoData();
+            await fetchHistoricalData();
+            await fetchNews();
+        }
+
+        // Actualizar datos cada 5 minutos
+        initDashboard();
+        setInterval(initDashboard, 300000);
+    </script>
+</body>
+</html>
